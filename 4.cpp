@@ -21,15 +21,17 @@ get_free_block(size_t size) {
 }
 
 pthread_mutex_t global_malloc_lock;
-pthread_mutex_t global_free_lock;
 
 void *mymalloc(size_t size) {
-    pthread_mutex_lock(&global_malloc_lock);
     size_t total_size;
     void *block;
     struct header_t *header;
     struct header_t *tmp;
-    if (!size) return NULL;
+    pthread_mutex_lock(&global_malloc_lock);
+    if (!size){
+        pthread_mutex_unlock(&global_malloc_lock);
+        return NULL;
+    }
     if (header = get_free_block(size)) {
         header->is_free = 0; 
         if (size+2*sizeof(struct header_t) < header->size){  // reduce waste
@@ -39,12 +41,15 @@ void *mymalloc(size_t size) {
             tmp->is_free = 1;
             header->next = tmp;
         }    
+        pthread_mutex_unlock(&global_malloc_lock);
         return header + 1; /* FIXME */
     }
 
     total_size = sizeof(struct header_t) + size;
-    if ((block = sbrk(total_size)) == (void *) -1)
+    if ((block = sbrk(total_size)) == (void *) -1){
+        pthread_mutex_unlock(&global_malloc_lock);
         return NULL;
+    }
 
     header = block;
     header->size = size;
